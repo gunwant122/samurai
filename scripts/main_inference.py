@@ -50,6 +50,17 @@ if save_to_video:
     vis_mask = {}
     vis_bbox = {}
 
+def save_mask(mask, frame_idx, output_folder):
+            """Save the mask as a black and white image."""
+            mask_img = np.zeros((mask.shape[0], mask.shape[1]), np.uint8)
+            mask_img[mask] = 255  # Set mask to white
+            mask_filename = os.path.join(output_folder, f'mask_frame_{frame_idx:08d}.png')
+            cv2.imwrite(mask_filename, mask_img)
+
+        # Ensure the output folder for masks exists
+mask_output_folder = f"masks/{exp_name}/{model_name}"
+os.makedirs(mask_output_folder, exist_ok=True)
+
 test_videos = sorted(test_videos)
 for vid, video in enumerate(test_videos):
 
@@ -98,6 +109,9 @@ for vid, video in enumerate(test_videos):
                     bbox = [x_min, y_min, x_max-x_min, y_max-y_min]
                 bbox_to_vis[obj_id] = bbox
                 mask_to_vis[obj_id] = mask
+
+                # Save the mask for the current object
+                save_mask(mask, frame_idx, mask_output_folder)  # Call the new function
 
             if save_to_video:
 
