@@ -11,6 +11,13 @@ from sam2.build_sam import build_sam2_video_predictor
 
 color = [(255, 0, 0)]
 
+def save_mask(mask, frame_idx, output_folder):
+    """Save the mask as a black and white image."""
+    mask_img = np.zeros((mask.shape[0], mask.shape[1]), np.uint8)
+    mask_img[mask] = 255  # Set mask to white
+    mask_filename = os.path.join(output_folder, f'mask_frame_{frame_idx:08d}.png')
+    cv2.imwrite(mask_filename, mask_img)
+
 def load_txt(gt_path):
     with open(gt_path, 'r') as f:
         gt = f.readlines()
@@ -69,6 +76,10 @@ def main(args):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(args.video_output_path, fourcc, frame_rate, (width, height))
 
+    # Ensure the output folder for masks exists
+    mask_output_folder = args.mask_output_folder
+    os.makedirs(mask_output_folder, exist_ok=True)
+
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
         state = predictor.init_state(frames_or_path, offload_video_to_cpu=True)
         bbox, track_label = prompts[0]
@@ -90,6 +101,9 @@ def main(args):
                     bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
                 bbox_to_vis[obj_id] = bbox
                 mask_to_vis[obj_id] = mask
+
+                # Save the mask for the current object
+                save_mask(mask, frame_idx, mask_output_folder)  # Call the new function
 
             if args.save_to_video:
                 img = loaded_frames[frame_idx]
@@ -117,6 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--txt_path", required=True, help="Path to ground truth text file.")
     parser.add_argument("--model_path", default="sam2/checkpoints/sam2.1_hiera_base_plus.pt", help="Path to the model checkpoint.")
     parser.add_argument("--video_output_path", default="demo.mp4", help="Path to save the output video.")
+    parser.add_argument("--mask_output_folder", default="masks/demo", help="Path to save the mask images.")
     parser.add_argument("--save_to_video", default=True, help="Save results to a video.")
     args = parser.parse_args()
     main(args)
