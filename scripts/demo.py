@@ -114,6 +114,7 @@ def main(args):
 
             if args.save_to_video:
                 img = loaded_frames[frame_idx]
+                frame_filename = os.path.join(frames_output_folder, f'frame_{frame_idx:08d}.png')
                 for obj_id, mask in mask_to_vis.items():
                     mask_img = np.zeros((height, width, 3), np.uint8)
                     mask_img[mask] = color[(obj_id + 1) % len(color)]
@@ -123,7 +124,7 @@ def main(args):
                     cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color[obj_id % len(color)], 2)
 
                 # Save the current frame to the frames folder
-                frame_filename = os.path.join(frames_output_folder, f'frame_{frame_idx:08d}.png')
+                
                 cv2.imwrite(frame_filename, img)  # Save the frame
 
                 out.write(img)
