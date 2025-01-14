@@ -6,6 +6,7 @@ import cv2
 import torch
 import gc
 import sys
+import ffmpeg  # Import ffmpeg
 sys.path.append("./sam2")
 from sam2.build_sam import build_sam2_video_predictor
 
@@ -85,7 +86,14 @@ def main(args):
     # Create a separate video for segmented objects if specified
     if args.create_segmented_video:
         segmented_video_output_path = os.path.join(args.frames_output_folder, "segmented_video.mp4")
-        segmented_out = cv2.VideoWriter(segmented_video_output_path, fourcc, frame_rate, (width, height))
+        # Initialize ffmpeg process for writing RGBA video
+        process = (
+            ffmpeg
+            .input('pipe:', format='rawvideo', s='{}x{}'.format(width, height), pix_fmt='rgba')
+            .output(segmented_video_output_path, pix_fmt='rgba', vcodec='libx264', crf=18)
+            .overwrite_output()
+            .run_async(pipe_stdin=True)
+        )
 
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
         state = predictor.init_state(frames_or_path, offload_video_to_cpu=True)
@@ -125,26 +133,22 @@ def main(args):
                 for obj_id, bbox in bbox_to_vis.items():
                     cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color[obj_id % len(color)], 2)
 
-                
-
                 out.write(img)
 
                 # Create a transparent background for the segmented video
                 if args.create_segmented_video:
-                    segmented_frame = np.zeros((height, width, 3), dtype=np.uint8)
-                    alpha_channel = np.zeros((height, width), dtype=np.uint8)  # Create an alpha channel
+                    segmented_frame = np.zeros((height, width, 4), dtype=np.uint8)  # Create an RGBA frame
                     for obj_id, mask in mask_to_vis.items():
-                        segmented_frame[mask] = img[mask]  # Only keep the segmented object
-                        alpha_channel[mask] = 255  # Set alpha to 255 where the mask is true
+                        segmented_frame[mask] = [img[mask][0], img[mask][1], img[mask][2], 255]  # Set RGB and alpha
 
-                    # Combine the segmented frame and alpha channel
-                    segmented_frame_with_alpha = cv2.merge((segmented_frame, alpha_channel))
-                    segmented_out.write(segmented_frame_with_alpha)
+                    # Write the RGBA frame to ffmpeg
+                    process.stdin.write(segmented_frame.tobytes())
 
         if args.save_to_video:
             out.release()
         if args.create_segmented_video:
-            segmented_out.release()
+            process.stdin.close()
+            process.wait()  # Wait for the ffmpeg process to finish
 
     del predictor, state
     gc.collect()
