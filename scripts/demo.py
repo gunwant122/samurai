@@ -122,9 +122,18 @@ def main(args):
 
             if args.save_to_video:
                 img = loaded_frames[frame_idx]
-                frame_filename = os.path.join(frames_output_folder, f'frame_{frame_idx:08d}.png')
                 # Save the current frame to the frames folder
+                frame_filename = os.path.join(frames_output_folder, f'frame_{frame_idx:08d}.png')
                 cv2.imwrite(frame_filename, img)  # Save the frame
+
+                if args.create_segmented_video:
+                    segmented_frame = np.zeros((height, width, 4), dtype=np.uint8)  # Create an RGBA frame
+                    for obj_id, mask in mask_to_vis.items():
+                        segmented_frame[mask, :3] = img[mask]        # Assign RGB values
+                        segmented_frame[mask, 3] = 255
+                    # Write the RGBA frame to ffmpeg
+                    process.stdin.write(segmented_frame.tobytes())
+
                 for obj_id, mask in mask_to_vis.items():
                     mask_img = np.zeros((height, width, 3), np.uint8)
                     mask_img[mask] = color[(obj_id + 1) % len(color)]
@@ -136,13 +145,7 @@ def main(args):
                 out.write(img)
 
                 # Create a transparent background for the segmented video
-                if args.create_segmented_video:
-                    segmented_frame = np.zeros((height, width, 4), dtype=np.uint8)  # Create an RGBA frame
-                    for obj_id, mask in mask_to_vis.items():
-                        segmented_frame[mask, :3] = img[mask]        # Assign RGB values
-                        segmented_frame[mask, 3] = 255
-                    # Write the RGBA frame to ffmpeg
-                    process.stdin.write(segmented_frame.tobytes())
+                
 
         if args.save_to_video:
             out.release()
