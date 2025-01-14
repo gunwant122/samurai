@@ -90,7 +90,7 @@ def main(args):
         process = (
             ffmpeg
             .input('pipe:', format='rawvideo', s='{}x{}'.format(width, height), pix_fmt='rgba')
-            .output(segmented_video_output_path, pix_fmt='rgba', vcodec='libx264', crf=18)
+            .output(segmented_video_output_path, vcodec='libx264', pix_fmt='yuv420p', crf=18)
             .overwrite_output()
             .run_async(pipe_stdin=True)
         )
@@ -139,8 +139,8 @@ def main(args):
                 if args.create_segmented_video:
                     segmented_frame = np.zeros((height, width, 4), dtype=np.uint8)  # Create an RGBA frame
                     for obj_id, mask in mask_to_vis.items():
-                        segmented_frame[mask] = [img[mask][0], img[mask][1], img[mask][2], 255]  # Set RGB and alpha
-
+                        segmented_frame[mask, :3] = img[mask]        # Assign RGB values
+                        segmented_frame[mask, 3] = 255
                     # Write the RGBA frame to ffmpeg
                     process.stdin.write(segmented_frame.tobytes())
 
