@@ -124,7 +124,6 @@ def main(args):
                     cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[0] + bbox[2], bbox[1] + bbox[3]), color[obj_id % len(color)], 2)
 
                 # Save the current frame to the frames folder
-                
                 cv2.imwrite(frame_filename, img)  # Save the frame
 
                 out.write(img)
@@ -132,9 +131,14 @@ def main(args):
                 # Create a transparent background for the segmented video
                 if args.create_segmented_video:
                     segmented_frame = np.zeros((height, width, 3), dtype=np.uint8)
+                    alpha_channel = np.zeros((height, width), dtype=np.uint8)  # Create an alpha channel
                     for obj_id, mask in mask_to_vis.items():
                         segmented_frame[mask] = img[mask]  # Only keep the segmented object
-                    segmented_out.write(segmented_frame)
+                        alpha_channel[mask] = 255  # Set alpha to 255 where the mask is true
+
+                    # Combine the segmented frame and alpha channel
+                    segmented_frame_with_alpha = cv2.merge((segmented_frame, alpha_channel))
+                    segmented_out.write(segmented_frame_with_alpha)
 
         if args.save_to_video:
             out.release()
@@ -153,7 +157,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", default="sam2/checkpoints/sam2.1_hiera_base_plus.pt", help="Path to the model checkpoint.")
     parser.add_argument("--video_output_path", default="demo.mp4", help="Path to save the output video.")
     parser.add_argument("--frames_output_folder", default="out", help="Path to save the masks and frames.")
-    parser.add_argument("--create_segmented_video",default=True, action='store_true', help="Create a video with only segmented objects.")
+    parser.add_argument("--create_segmented_video", default=True, action='store_true', help="Create a video with only segmented objects.")
     parser.add_argument("--save_to_video", default=True, help="Save results to a video.")
     args = parser.parse_args()
     main(args)
